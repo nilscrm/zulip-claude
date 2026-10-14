@@ -1,0 +1,16 @@
+[project]
+name = "zulip-claude"
+version = "0.2.0"
+description = "Mention Claude in a Zulip topic: it answers, or works on your repo via Claude Managed Agents."
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=1.14",
+    "zulip>=0.9",
+]
+
+[project.scripts]
+zulip-claude = "zulip_claude.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
