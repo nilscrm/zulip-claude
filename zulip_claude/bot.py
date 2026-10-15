@@ -17,6 +17,7 @@ import zulip
 
 from .config import Config
 from .managed import ManagedAgents, github_repo_url, repo_name
+from .zulip_tools import ZulipReader
 
 log = logging.getLogger(__name__)
 
@@ -289,7 +290,8 @@ class Bot:
             )
             cost_before = 0.0
 
-        result = await self.agents.run_turn(session_id, prompt, status.progress)
+        reader = ZulipReader(self.call, msg, self.user_id)
+        result = await self.agents.run_turn(session_id, prompt, status.progress, reader.run)
         cost = await self.agents.list_cost_usd(session_id)
         self.state.set(state_key, session_id=session_id, last_message_id=msg["id"], cost_usd=cost)
 
