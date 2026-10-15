@@ -128,7 +128,10 @@ class Bot:
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
         # Credentials come from ZULIP_EMAIL / ZULIP_API_KEY / ZULIP_SITE or ZULIP_CONFIG.
-        self.client = zulip.Client(client="zulip-claude")
+        try:
+            self.client = zulip.Client(client="zulip-claude")
+        except zulip.ConfigNotFoundError:
+            raise SystemExit("Zulip credentials missing: set ZULIP_SITE, ZULIP_EMAIL and ZULIP_API_KEY (e.g. in .env).")
         profile = self.client.get_profile()
         if profile.get("result") != "success":
             raise SystemExit(f"Could not authenticate with Zulip: {profile.get('msg')}")

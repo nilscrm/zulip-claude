@@ -4,8 +4,32 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
+
+
+def load_env_file(path: Path = Path(".env")) -> None:
+    """Load KEY=VALUE lines from a local .env file, for running outside Docker.
+
+    Variables already set in the environment win. Empty values are skipped: an
+    empty ANTHROPIC_API_KEY would otherwise shadow an `ant auth login` profile or
+    workload identity federation.
+    """
+    if not path.is_file():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.removeprefix("export ").split("=", 1)
+        key, value = key.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        else:
+            value = re.split(r"\s+#", value, maxsplit=1)[0].strip()  # trailing comment
+        if value and key not in os.environ:
+            os.environ[key] = value
 
 
 def _optional(name: str) -> str | None:
@@ -54,7 +78,7 @@ class Config:
     def from_env(cls) -> Config:
         budget = _optional("SESSION_BUDGET_USD")
         return cls(
-            data_dir=Path(os.environ.get("DATA_DIR", "/data")),
+            data_dir=Path(os.environ.get("DATA_DIR", "data")),
             repos=json.loads(os.environ.get("ZULIP_CLAUDE_REPOS", "{}")),
             default_repo=_optional("DEFAULT_REPO"),
             allowed_users=frozenset(

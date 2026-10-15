@@ -42,31 +42,59 @@ Zulip ──mention──▶ this bot (your server) ──▶ Managed Agents ses
    bot**, named e.g. "Claude". Copy its email and API key.
 2. **Subscribe the bot to the channels** where it should respond. A bot only receives
    mentions in channels it's subscribed to.
-3. **Configure:** `cp .env.example .env` and fill in the Zulip credentials, `ANTHROPIC_API_KEY`
-   (Managed Agents is in beta; the key's organization needs access), `GH_TOKEN` (a fine-grained
-   token with *Contents* and *Pull requests* read/write on the repos), and the channel → repo map.
-4. **Create the agent, environment and vault** (once, and again after changing model, effort,
-   network or web settings, or rotating `GH_TOKEN`):
+3. **Configure:** `cp .env.example .env` and fill in the Zulip credentials, Claude
+   authentication (see below), `GH_TOKEN` (a fine-grained token with *Contents* and *Pull
+   requests* read/write on the repos), and the channel → repo map. Managed Agents is in beta,
+   so your Anthropic organization needs access to it.
 
-   ```bash
-   docker compose run --rm zulip-claude zulip-claude setup
-   ```
+**Claude authentication.** Use exactly one of these:
+- **`ant auth login`** (easiest locally): log in once and leave the Anthropic variables out.
+- **`ANTHROPIC_API_KEY`**.
+- **Workload identity federation** (for servers, e.g. on AWS): set the `ANTHROPIC_FEDERATION_*`
+  variables from `.env.example`.
 
-   This stores their IDs in the `data` volume. Re-running it updates them in place.
-5. **Run:**
+Leave the others out entirely. Even an empty `ANTHROPIC_API_KEY=` line takes priority and
+breaks the other two.
 
-   ```bash
-   docker compose up -d --build
-   ```
+Only run **one copy of the bot per Zulip bot account**, or every mention gets answered twice.
+Use a separate Zulip bot (and test channel) for local testing.
 
-   Logs: `docker compose logs -f`.
+### Run locally
+
+Needs [uv](https://docs.astral.sh/uv/). The bot reads `.env` from the current directory and
+keeps its state in `./data`.
+
+```bash
+uv sync
+uv run zulip-claude setup
+uv run zulip-claude
+```
+
+The bot only answers while it's running. Mentions sent while it's stopped, or while your
+laptop sleeps, are not picked up later.
+
+### Run on a server (Docker)
+
+```bash
+docker compose run --rm zulip-claude zulip-claude setup
+docker compose up -d --build
+```
+
+State lives in the `data` volume; logs: `docker compose logs -f`.
+
+Run `setup` once, and again after changing the model, effort, network or web settings, or
+rotating `GH_TOKEN`. It updates the existing agent in place.
+
+On **AWS**, any always-on single instance works, for example a small EC2 instance with Docker
+or an ECS service with one task. The `/data` directory must survive restarts, so on ECS
+mount an EFS volume there, and keep secrets in Secrets Manager or SSM instead of a `.env` file.
 
 ## Configuration
 
 | Variable | Default | |
 |---|---|---|
 | `ZULIP_SITE`, `ZULIP_EMAIL`, `ZULIP_API_KEY` | – | Bot credentials (or `ZULIP_CONFIG` pointing at a zuliprc). |
-| `ANTHROPIC_API_KEY` | – | Creates and drives the agent sessions. |
+| `ANTHROPIC_API_KEY` | – | Or `ant auth login`, or the federation variables; see above. |
 | `GH_TOKEN` | – | Mounts repos, lets the agent push branches and open PRs. |
 | `ZULIP_CLAUDE_REPOS` | `{}` | JSON map of channel name → `owner/name` (GitHub only). |
 | `DEFAULT_REPO` | none | Repo for DMs and unmapped channels; empty = empty sandbox. |
@@ -78,6 +106,7 @@ Zulip ──mention──▶ this bot (your server) ──▶ Managed Agents ses
 | `SESSION_BUDGET_USD` | none | Hard spend cap per topic's agent session. |
 | `AGENT_TIMEOUT_SECONDS` | `3600` | Interrupt a run that takes longer. |
 | `MAX_CONCURRENT_RUNS` | `3` | Agent runs in progress at once. |
+| `DATA_DIR` | `./data` (`/data` in Docker) | Agent IDs and the topic → session map. |
 | `CONTEXT_MESSAGES` | `50` | History given to a new session. |
 | `CONSOLE_WORKSPACE` | `default` | Workspace ID used in trace links. |
 
@@ -92,12 +121,3 @@ Managed Agents objects, so run `zulip-claude setup` again after changing them.
 - Set `SESSION_BUDGET_USD` to cap spend per topic.
 - Anything in a topic or a repo can try to steer the agent (prompt injection). Don't map
   channels where outsiders post to repos with powerful tokens.
-
-## Local development
-
-```bash
-uv venv --python 3.12 && uv pip install -e .
-set -a; source .env; set +a
-DATA_DIR=./data zulip-claude setup
-DATA_DIR=./data zulip-claude
-```
