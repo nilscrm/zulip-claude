@@ -26,6 +26,12 @@ Zulip ──mention──▶ this bot (your server) ──▶ Managed Agents ses
   session with the channel's repo mounted (`ZULIP_CLAUDE_REPOS`). Add `repo:owner/name` to a
   message to use a different repo. Follow-ups in the topic go to the same session, so
   "now add a test too" continues on the same branch.
+- **Reads other channels and topics.** The agent can list topics, read a topic and search
+  messages ("what did we decide in #infra > deploys?"). The bot runs these calls itself, so
+  the Zulip API key stays on your server. Each call is checked against who will see the reply:
+  the current channel and public channels are readable (guests: only channels they're
+  subscribed to); private channels only from a DM where everyone in it is subscribed; other
+  DMs never.
 - **Credentials never enter the sandbox.** Git pushes and the GitHub `create_pull_request`
   tool are authenticated by Anthropic-side proxies.
 - **Feedback:** 🛠️ on your message while working; a status message shows the agent's current
@@ -82,8 +88,8 @@ docker compose up -d --build
 
 State lives in the `data` volume; logs: `docker compose logs -f`.
 
-Run `setup` once, and again after changing the model, effort, network or web settings, or
-rotating `GH_TOKEN`. It updates the existing agent in place.
+Run `setup` once, and again after changing the model, effort, network or web settings,
+rotating `GH_TOKEN`, or upgrading the bot. It updates the existing agent in place.
 
 On **AWS**, any always-on single instance works, for example a small EC2 instance with Docker
 or an ECS service with one task. The `/data` directory must survive restarts, so on ECS
@@ -119,5 +125,5 @@ Managed Agents objects, so run `zulip-claude setup` again after changing them.
   so nothing merges without review.
 - Set `ALLOWED_USERS` unless everyone in your Zulip org should be able to drive it.
 - Set `SESSION_BUDGET_USD` to cap spend per topic.
-- Anything in a topic or a repo can try to steer the agent (prompt injection). Don't map
-  channels where outsiders post to repos with powerful tokens.
+- Anything in a topic, another channel the agent reads, or a repo can try to steer the agent
+  (prompt injection). Don't map channels where outsiders post to repos with powerful tokens.
