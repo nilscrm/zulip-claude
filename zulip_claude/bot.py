@@ -168,14 +168,17 @@ class Bot:
 
         def on_event(event: dict[str, Any]) -> None:
             if event["type"] == "message":
-                asyncio.run_coroutine_threadsafe(
-                    self.on_message(event["message"], event.get("flags", [])), loop
-                )
+                coro = self.on_message(event["message"], event.get("flags", []))
+            elif event["type"] == "update_message":
+                coro = self.on_edit(event)
+            else:
+                return
+            asyncio.run_coroutine_threadsafe(coro, loop)
 
         log.info("listening as %s (%s)", self.name, self.email)
         # Blocks forever, long-polling Zulip's event queue in a worker thread.
         await asyncio.to_thread(
-            listener.call_on_each_event, on_event, ["message"], None, apply_markdown=False
+            listener.call_on_each_event, on_event, ["message", "update_message"], None, apply_markdown=False
         )
 
     async def on_message(self, msg: dict[str, Any], flags: list[str]) -> None:
@@ -183,6 +186,25 @@ class Bot:
             await self._on_message(msg, flags)
         except Exception:
             log.exception("failed to handle message %s", msg.get("id"))
+
+    async def on_edit(self, event: dict[str, Any]) -> None:
+        """Handle a channel message that was edited to mention the bot."""
+        if event.get("rendering_only") or "content" not in event or "mentioned" not in event.get("flags", []):
+            return
+        # Edits to a message that already mentioned the bot (e.g. typo fixes) shouldn't run it again.
+        if re.search(rf'class="user-mention" data-user-id="{self.user_id}"', event.get("orig_rendered_content", "")):
+            return
+        try:
+            res = await self.call("get_messages", {
+                "anchor": event["message_id"], "num_before": 0, "num_after": 0, "apply_markdown": False,
+            })
+        except Exception:
+            log.exception("failed to fetch edited message %s", event["message_id"])
+            return
+        messages = res.get("messages", [])
+        # DMs are handled when sent, so an edit to one shouldn't trigger a second run.
+        if messages and messages[0]["type"] == "stream":
+            await self.on_message(messages[0], messages[0].get("flags", []))
 
     def _is_allowed(self, msg: dict[str, Any]) -> bool:
         allowed = self.cfg.allowed_users
@@ -274,6 +296,8 @@ class Bot:
                 f"Respond to the last message, from {sender}."
             )
             cost_before = saved.get("cost_usd") or 0.0
+            # An older message can be edited to mention the bot; don't move the marker backwards.
+            last_message_id = max(msg["id"], saved.get("last_message_id") or 0)
         else:
             session_id = await self.agents.create_session(
                 title=thread.label, repo_url=repo, metadata={"zulip_thread": thread.key[:512]},
@@ -289,11 +313,12 @@ class Bot:
                 f"Respond to the last message, from {sender}."
             )
             cost_before = 0.0
+            last_message_id = msg["id"]
 
         reader = ZulipReader(self.call, msg, self.user_id)
         result = await self.agents.run_turn(session_id, prompt, status.progress, reader.run)
         cost = await self.agents.list_cost_usd(session_id)
-        self.state.set(state_key, session_id=session_id, last_message_id=msg["id"], cost_usd=cost)
+        self.state.set(state_key, session_id=session_id, last_message_id=last_message_id, cost_usd=cost)
 
         await self.reply(thread, result.text)
         summary = (
