@@ -37,6 +37,12 @@ def _optional(name: str) -> str | None:
     return value or None
 
 
+def _repo_list(value: str | list[str]) -> list[str]:
+    """A repo spec from config: one `owner/name`, a comma-separated string, or a JSON list."""
+    items = value.split(",") if isinstance(value, str) else value
+    return [r.strip() for r in items if r.strip()]
+
+
 def _flag(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
@@ -44,10 +50,10 @@ def _flag(name: str) -> bool:
 @dataclass(frozen=True)
 class Config:
     data_dir: Path
-    # Zulip channel name -> GitHub repo. Agent sessions in a mapped channel get that repo mounted.
-    repos: dict[str, str]
-    # Repo for DMs and unmapped channels. None means the agent gets an empty sandbox.
-    default_repo: str | None
+    # Zulip channel name -> GitHub repos. Agent sessions in a mapped channel get them all mounted.
+    repos: dict[str, list[str]]
+    # Repos for DMs and unmapped channels. Empty means the agent gets an empty sandbox.
+    default_repos: list[str]
     # Lowercased emails or user ids allowed to trigger the bot. Empty means everyone.
     allowed_users: frozenset[str]
     model: str
@@ -79,8 +85,11 @@ class Config:
         budget = _optional("SESSION_BUDGET_USD")
         return cls(
             data_dir=Path(os.environ.get("DATA_DIR", "data")),
-            repos=json.loads(os.environ.get("ZULIP_CLAUDE_REPOS", "{}")),
-            default_repo=_optional("DEFAULT_REPO"),
+            repos={
+                channel: _repo_list(spec)
+                for channel, spec in json.loads(os.environ.get("ZULIP_CLAUDE_REPOS", "{}")).items()
+            },
+            default_repos=_repo_list(os.environ.get("DEFAULT_REPO", "")),
             allowed_users=frozenset(
                 e.strip().lower()
                 for e in os.environ.get("ALLOWED_USERS", "").split(",")

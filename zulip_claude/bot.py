@@ -241,10 +241,15 @@ class Bot:
                 await self.react(msg["id"], "working_on_it", add=False)
                 await self.react(msg["id"], "check" if ok else "cross_mark")
 
-    def pick_repo(self, content: str, thread: Thread) -> str | None:
-        override = REPO_OVERRIDE.search(content)
-        repo = override.group(1) if override else self.cfg.repos.get(thread.channel or "") or self.cfg.default_repo
-        return github_repo_url(repo) if repo else None
+    def pick_repos(self, content: str, thread: Thread) -> list[str]:
+        """Repo URLs for this message: `repo:` overrides, else the channel's repos, else the default."""
+        overrides = [r for spec in REPO_OVERRIDE.findall(content) for r in spec.split(",") if r]
+        repos = overrides or self.cfg.repos.get(thread.channel or "") or self.cfg.default_repos
+        urls = list(dict.fromkeys(github_repo_url(r) for r in repos))
+        names = [repo_name(u) for u in urls]
+        if len(set(names)) < len(names):
+            raise ValueError(f"These repos would share a directory under /workspace: {', '.join(urls)}")
+        return urls
 
     async def fetch_history(self, msg: dict[str, Any], thread: Thread,
                             after_id: int | None = None) -> list[dict[str, Any]]:
@@ -270,19 +275,20 @@ class Bot:
     async def handle(self, msg: dict[str, Any], thread: Thread) -> bool:
         """Send the message to this topic's agent session. Returns whether it succeeded."""
         try:
-            repo = self.pick_repo(msg["content"], thread)
+            repos = self.pick_repos(msg["content"], thread)
         except ValueError as e:
             await self.reply(thread, str(e))
             return False
-        state_key = f"{thread.key}|{repo or ''}"
+        state_key = f"{thread.key}|{','.join(repos)}"
         saved = self.state.get(state_key)
-        if repo and not self.cfg.github_token:
+        if repos and not self.cfg.github_token:
             await self.reply(thread, "I need a GitHub token (`GH_TOKEN`) to work on repositories.")
             return False
 
         started = time.monotonic()
         status = StatusMessage(self, thread)
-        await status.post("Working on it" + (f" in `{repo_name(repo)}`" if repo else "") + "…")
+        in_repos = ", ".join(f"`{repo_name(r)}`" for r in repos)
+        await status.post("Working on it" + (f" in {in_repos}" if repos else "") + "…")
         sender = msg["sender_full_name"]
 
         session_id = saved.get("session_id")
@@ -300,12 +306,16 @@ class Bot:
             last_message_id = max(msg["id"], saved.get("last_message_id") or 0)
         else:
             session_id = await self.agents.create_session(
-                title=thread.label, repo_url=repo, metadata={"zulip_thread": thread.key[:512]},
+                title=thread.label, repo_urls=repos, metadata={"zulip_thread": thread.key[:512]},
             )
-            where = (
-                f"The repository {repo} is checked out at /workspace/{repo_name(repo)}."
-                if repo else "No repository is attached; you have an empty sandbox."
-            )
+            if len(repos) == 1:
+                where = f"The repository {repos[0]} is checked out at /workspace/{repo_name(repos[0])}."
+            elif repos:
+                where = "These repositories are checked out:\n" + "\n".join(
+                    f"- {r} at /workspace/{repo_name(r)}" for r in repos
+                )
+            else:
+                where = "No repository is attached; you have an empty sandbox."
             history = await self.fetch_history(msg, thread)
             prompt = (
                 f"You were mentioned on Zulip in {thread.label} by {sender}. {where}\n\n"
