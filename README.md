@@ -23,8 +23,10 @@ Zulip ──mention──▶ this bot (your server) ──▶ Managed Agents ses
 ```
 
 - **Agent work** runs on Anthropic's infrastructure. Each topic gets its own long-lived
-  session with the channel's repo mounted (`ZULIP_CLAUDE_REPOS`). Add `repo:owner/name` to a
-  message to use a different repo. Follow-ups in the topic go to the same session, so
+  session with the channel's repos mounted (`ZULIP_CLAUDE_REPOS`), each at `/workspace/<name>`.
+  Map a channel to several repos (e.g. backend + frontend) and the agent can change them
+  together, opening a PR in each. Add `repo:owner/name` to a message to use a different repo
+  (repeat it, or comma-separate, for several). Follow-ups in the topic go to the same session, so
   "now add a test too" continues on the same branch.
 - **Reads other channels and topics.** The agent can list topics, read a topic and search
   messages ("what did we decide in #infra > deploys?"). The bot runs these calls itself, so
@@ -102,8 +104,8 @@ mount an EFS volume there, and keep secrets in Secrets Manager or SSM instead of
 | `ZULIP_SITE`, `ZULIP_EMAIL`, `ZULIP_API_KEY` | – | Bot credentials (or `ZULIP_CONFIG` pointing at a zuliprc). |
 | `ANTHROPIC_API_KEY` | – | Or `ant auth login`, or the federation variables; see above. |
 | `GH_TOKEN` | – | Mounts repos, lets the agent push branches and open PRs. |
-| `ZULIP_CLAUDE_REPOS` | `{}` | JSON map of channel name → `owner/name` (GitHub only). |
-| `DEFAULT_REPO` | none | Repo for DMs and unmapped channels; empty = empty sandbox. |
+| `ZULIP_CLAUDE_REPOS` | `{}` | JSON map of channel name → `owner/name`, or a list of them (GitHub only). |
+| `DEFAULT_REPO` | none | Repo(s) for DMs and unmapped channels, comma-separated; empty = empty sandbox. |
 | `ALLOWED_USERS` | everyone | Comma-separated emails or Zulip user ids. |
 | `CLAUDE_MODEL` | `claude-opus-5-5` | |
 | `AGENT_EFFORT` | `high` | `low` … `max`. |

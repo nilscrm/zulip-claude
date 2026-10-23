@@ -225,20 +225,20 @@ class ManagedAgents:
             return False
         return session.status != "terminated" and session.archived_at is None
 
-    async def create_session(self, title: str, repo_url: str | None, metadata: dict[str, str]) -> str:
+    async def create_session(self, title: str, repo_urls: list[str], metadata: dict[str, str]) -> str:
         kwargs: dict[str, Any] = {
             "agent": self.ids["agent_id"],
             "environment_id": self.ids["environment_id"],
             "title": title[:200],
             "metadata": metadata,
         }
-        if repo_url:
+        if repo_urls:
             kwargs["resources"] = [{
                 "type": "github_repository",
-                "url": repo_url,
-                "mount_path": f"/workspace/{repo_name(repo_url)}",
+                "url": url,
+                "mount_path": f"/workspace/{repo_name(url)}",
                 "authorization_token": self.cfg.github_token,
-            }]
+            } for url in repo_urls]
         if "vault_id" in self.ids:
             kwargs["vault_ids"] = [self.ids["vault_id"]]
         if self.cfg.session_budget_usd:
