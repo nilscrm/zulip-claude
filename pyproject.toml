@@ -5,6 +5,7 @@ description = "Mention Claude in a Zulip topic: it answers, or works on your rep
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=1.14",
+    "httpx2",
     "zulip>=0.9",
 ]
 
