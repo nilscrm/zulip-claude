@@ -644,11 +644,13 @@ version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "httpx2" },
     { name = "zulip" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=1.14" },
+    { name = "httpx2" },
     { name = "zulip", specifier = ">=0.9" },
 ]

@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import anthropic
+import httpx2
 
 from . import zulip_tools
 from .config import Config
@@ -308,7 +309,9 @@ class ManagedAgents:
                         seen.add(event.id)
                         if await self._handle(session_id, event, state, on_progress, run_tool):
                             return
-            except (anthropic.APIConnectionError, anthropic.APITimeoutError):
+            # The SDK wraps network errors only while connecting; a drop mid-stream
+            # surfaces as the raw httpx2 error (e.g. RemoteProtocolError).
+            except (anthropic.APIConnectionError, anthropic.APITimeoutError, httpx2.TransportError):
                 log.warning("event stream for %s dropped; reconnecting", session_id, exc_info=True)
             await asyncio.sleep(2)
 
