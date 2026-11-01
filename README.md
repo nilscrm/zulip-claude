@@ -90,8 +90,8 @@ docker compose up -d --build
 
 State lives in the `data` volume; logs: `docker compose logs -f`.
 
-Run `setup` once, and again after changing the model, effort, network (including allowed hosts) or web settings,
-rotating `GH_TOKEN`, or upgrading the bot. It updates the existing agent in place.
+Run `setup` once, and again after changing the model, effort, network, allowed hosts or web
+settings, rotating `GH_TOKEN`, or upgrading the bot. It updates the existing agent in place.
 
 On **AWS**, any always-on single instance works, for example a small EC2 instance with Docker
 or an ECS service with one task. The `/data` directory must survive restarts, so on ECS
