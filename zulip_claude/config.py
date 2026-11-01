@@ -62,6 +62,8 @@ class Config:
     github_token: str | None
     # "limited" (package registries + GitHub only) or "unrestricted".
     agent_network: str
+    # Extra hosts the sandbox can reach with "limited" networking.
+    agent_allowed_hosts: list[str]
     agent_web: bool
     # Hard spend cap per agent session (one session per topic), in USD.
     session_budget_usd: float | None
@@ -99,6 +101,9 @@ class Config:
             agent_effort=os.environ.get("AGENT_EFFORT", "high"),
             github_token=_optional("GH_TOKEN") or _optional("GITHUB_TOKEN"),
             agent_network=os.environ.get("AGENT_NETWORK", "limited"),
+            agent_allowed_hosts=[
+                h.strip() for h in os.environ.get("AGENT_ALLOWED_HOSTS", "").split(",") if h.strip()
+            ],
             agent_web=_flag("AGENT_WEB"),
             session_budget_usd=float(budget) if budget else None,
             run_timeout_s=int(os.environ.get("AGENT_TIMEOUT_SECONDS", "3600")),

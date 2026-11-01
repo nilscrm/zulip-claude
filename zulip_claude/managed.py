@@ -115,7 +115,13 @@ def environment_config(cfg: Config) -> dict[str, Any]:
     if cfg.agent_network == "unrestricted":
         networking: dict[str, Any] = {"type": "unrestricted"}
     else:
-        networking = {"type": "limited", "allow_package_managers": True, "allow_mcp_servers": True}
+        networking = {
+            "type": "limited",
+            "allow_package_managers": True,
+            "allow_mcp_servers": True,
+            # Always sent: on update, an omitted field keeps the old list.
+            "allowed_hosts": cfg.agent_allowed_hosts,
+        }
     return {"type": "cloud", "networking": networking}
 
 

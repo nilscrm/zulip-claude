@@ -90,7 +90,7 @@ docker compose up -d --build
 
 State lives in the `data` volume; logs: `docker compose logs -f`.
 
-Run `setup` once, and again after changing the model, effort, network or web settings,
+Run `setup` once, and again after changing the model, effort, network (including allowed hosts) or web settings,
 rotating `GH_TOKEN`, or upgrading the bot. It updates the existing agent in place.
 
 On **AWS**, any always-on single instance works, for example a small EC2 instance with Docker
@@ -110,6 +110,7 @@ mount an EFS volume there, and keep secrets in Secrets Manager or SSM instead of
 | `CLAUDE_MODEL` | `claude-opus-5-5` | |
 | `AGENT_EFFORT` | `high` | `low` … `max`. |
 | `AGENT_NETWORK` | `limited` | `limited` allows package registries and GitHub; `unrestricted` allows everything. |
+| `AGENT_ALLOWED_HOSTS` | none | Extra hosts for `limited` networking, comma-separated (e.g. `release.lean-lang.org,cache.mathlib.org`). |
 | `AGENT_WEB` | off | Let the agent use web search and fetch. |
 | `SESSION_BUDGET_USD` | none | Hard spend cap per topic's agent session. |
 | `AGENT_TIMEOUT_SECONDS` | `3600` | Interrupt a run that takes longer. |
@@ -118,8 +119,9 @@ mount an EFS volume there, and keep secrets in Secrets Manager or SSM instead of
 | `CONTEXT_MESSAGES` | `50` | History given to a new session. |
 | `CONSOLE_WORKSPACE` | `default` | Workspace ID used in trace links. |
 
-`CLAUDE_MODEL`, `AGENT_EFFORT`, `AGENT_NETWORK`, `AGENT_WEB` and `GH_TOKEN` are stored on the
-Managed Agents objects, so run `zulip-claude setup` again after changing them.
+`CLAUDE_MODEL`, `AGENT_EFFORT`, `AGENT_NETWORK`, `AGENT_ALLOWED_HOSTS`, `AGENT_WEB` and
+`GH_TOKEN` are stored on the Managed Agents objects, so run `zulip-claude setup` again after
+changing them.
 
 ## Security
 
